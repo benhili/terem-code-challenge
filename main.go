@@ -43,15 +43,12 @@ func getRainfall(rainfallAmount string) float32 {
 
 func parseWeatherData(records [][]string) WeatherData {
 	var data WeatherData
-
 	var year WeatherDataForYear
-
-	var monthlyAggregates MonthlyAggregates
 	var month WeatherDataForMonth
+	var monthlyAggregates MonthlyAggregates
 
 	var prevYear string
 	var prevMonth string
-
 	var prevDate string
 
 	for idx, record := range records {
@@ -102,7 +99,7 @@ func parseWeatherData(records [][]string) WeatherData {
 }
 
 func main() {
-	records := parseCsv("bom_minimal.csv")
-	monthlyAggregates := parseWeatherData(records)
-	printJson(monthlyAggregates)
+	records := parseCsv("bom_all.csv")
+	weatherData := parseWeatherData(records)
+	printJson(weatherData)
 }
