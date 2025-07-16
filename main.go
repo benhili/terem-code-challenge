@@ -1,68 +1,72 @@
-/*
-{
- "WeatherData": {
- "WeatherDataForYear": {
- "Year": "2019",
- "FirstRecordedDate": "2019-01-01",
- "LastRecordedDate": "2019-04-19",
- "TotalRainfall": "374.2",
- "AverageDailyRainfall": "3.433027523",
- "DaysWithNoRainfall": "65",
- "DaysWithRainfall": "44",
- "MonthlyAggregates": {
- "WeatherDataForMonth": {
- "Month": "January",
- "FirstRecordedDate": "2019-01-01",
- "LastRecordedDate": "2019-01-31",
- "TotalRainfall": "48.8",
- "AverageDailyRainfall": "1.574193548",
- "DaysWithNoRainfall": "21",
- "DaysWithRainfall": "10"
- }
- }
- }
- }
-}
-*/
-
 package main
 
 import (
-	"encoding/csv"
-	"os"
+	"encoding/json"
+	"fmt"
+	"strconv"
 )
 
-func getMonthlyAggregates(records [][]string) []map[string]string {
-	var aggregates []map[string]string
-	// for _, record := range records {
+func getWeatherDataForMonth(monthData WeatherDataForMonth, month string, lastDate string) WeatherDataForMonth {
+	monthData.LastRecordedDate = lastDate
+	monthData.Month = Months[month]
+	if monthData.TotalRainfall > 0 {
+		monthData.AverageDailyRainfall = monthData.TotalRainfall / float32(monthData.DaysWithRainfall+monthData.DaysWithNoRainfall)
+	} else {
+		monthData.AverageDailyRainfall = 0
+	}
 
-	// }
-	return aggregates
+	return monthData
 }
 
-func parseCsv(filename string) [][]string {
-	file, err := os.Open(filename)
-	if err != nil {
-		panic("Failed to read CSV file: " + err.Error())
-	}
-	defer file.Close()
+func parseMonthlyAggregates(records [][]string) MonthlyAggregates {
+	var monthlyAggregates MonthlyAggregates
+	var prevMonth string
+	var prevDate string
+	var currMonthData WeatherDataForMonth
 
-	reader := csv.NewReader(file)
-	// Skip header
-	reader.Read()
-	records, err := reader.ReadAll()
-	if err != nil {
-		panic("Failed to read CSV file: " + err.Error())
+	for idx, record := range records {
+		date := record[Year] + "-" + record[Month] + "-" + record[Day]
+
+		if prevMonth != record[Month] {
+			if idx != 0 {
+				monthlyAggregates.WeatherDataForMonth = append(monthlyAggregates.WeatherDataForMonth, getWeatherDataForMonth(currMonthData, prevMonth, prevDate))
+			}
+
+			currMonthData = WeatherDataForMonth{}
+			currMonthData.FirstRecordedDate = date
+		}
+
+		rainfall, err := strconv.ParseFloat(record[RainfallAmount], 32)
+		if err != nil {
+			panic(err)
+		}
+
+		currMonthData.TotalRainfall += float32(rainfall)
+		if rainfall > 0.0 {
+			currMonthData.DaysWithRainfall += 1
+		} else {
+			currMonthData.DaysWithNoRainfall += 1
+		}
+
+		prevDate = date
+		prevMonth = record[Month]
 	}
-	return records
+
+	monthlyAggregates.WeatherDataForMonth = append(monthlyAggregates.WeatherDataForMonth, getWeatherDataForMonth(currMonthData, prevMonth, prevDate))
+
+	return monthlyAggregates
 }
 
 func main() {
-	records := parseCsv("IDCJAC0009_066062_1800_Data.csv")
+	records := parseCsv("bom_minimal.csv")
 	if len(records) == 0 {
 		println("Error parsing CSV or no records found.")
 		return
 	}
-	// for _, record := range records {
-	// }
+	monthlyAggregates := parseMonthlyAggregates(records)
+	jsonBytes, err := json.MarshalIndent(monthlyAggregates, "", "    ")
+	if err != nil {
+		panic(err)
+	}
+	fmt.Print(string(jsonBytes))
 }
