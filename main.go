@@ -32,42 +32,37 @@ import (
 	"os"
 )
 
-// func getMonthlyAggregates(records [][]string) []map[string]string {
-// 	aggregates := make(map[string]string)
-// 	for idx, record := range records {
-// 		if idx == 0 {
-// 			aggregates["firstRecordedDate"] = record[1]
-// 		}
+func getMonthlyAggregates(records [][]string) []map[string]string {
+	var aggregates []map[string]string
+	// for _, record := range records {
 
-// 			aggregates["FirstRecordedDate"] = record[1]
-// 			aggregates["LastRecordedDate"] = record[2]
-// 			aggregates["TotalRainfall"] = record[3]
-// 			aggregates["AverageDailyRainfall"] = record[4]
-// 			aggregates["DaysWithNoRainfall"] = record[5]
-// 			aggregates["DaysWithRainfall"] = record[6]
-// 			break
-// 		}
-// 	}
-// 	return aggregates
-// }
+	// }
+	return aggregates
+}
 
-func main() {
-	file, err := os.Open("IDCJAC0009_066062_1800_Data.csv")
+func parseCsv(filename string) [][]string {
+	file, err := os.Open(filename)
 	if err != nil {
-		println("Error opening file:", err)
-		return
+		panic("Failed to read CSV file: " + err.Error())
 	}
 	defer file.Close()
 
 	reader := csv.NewReader(file)
+	// Skip header
+	reader.Read()
 	records, err := reader.ReadAll()
 	if err != nil {
-		println("Error reading CSV:", err)
+		panic("Failed to read CSV file: " + err.Error())
+	}
+	return records
+}
+
+func main() {
+	records := parseCsv("IDCJAC0009_066062_1800_Data.csv")
+	if len(records) == 0 {
+		println("Error parsing CSV or no records found.")
 		return
 	}
-
-	for _, record := range records {
-	}
-
-	println("Weather data processing application started.")
+	// for _, record := range records {
+	// }
 }
