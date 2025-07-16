@@ -1,8 +1,6 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
 	"strconv"
 )
 
@@ -18,55 +16,93 @@ func getWeatherDataForMonth(monthData WeatherDataForMonth, month string, lastDat
 	return monthData
 }
 
-func parseMonthlyAggregates(records [][]string) MonthlyAggregates {
+func getWeatherDataForYear(yearData WeatherDataForYear, year string, lastDate string) WeatherDataForYear {
+	yearData.LastRecordedDate = lastDate
+	yearData.Year = year
+
+	if yearData.TotalRainfall > 0 {
+		yearData.AverageDailyRainfall = yearData.TotalRainfall / float32(yearData.DaysWithRainfall+yearData.DaysWithNoRainfall)
+	} else {
+		yearData.AverageDailyRainfall = 0
+	}
+
+	return yearData
+}
+
+func getRainfall(rainfallAmount string) float32 {
+	if rainfallAmount == "" {
+		return 0
+	} else {
+		parsedRainfall, err := strconv.ParseFloat(rainfallAmount, 32)
+		if err != nil {
+			panic(err)
+		}
+		return float32(parsedRainfall)
+	}
+}
+
+func parseWeatherData(records [][]string) WeatherData {
+	var data WeatherData
+
+	var year WeatherDataForYear
+
 	var monthlyAggregates MonthlyAggregates
+	var month WeatherDataForMonth
+
+	var prevYear string
 	var prevMonth string
+
 	var prevDate string
-	var currMonthData WeatherDataForMonth
 
 	for idx, record := range records {
 		date := record[Year] + "-" + record[Month] + "-" + record[Day]
 
 		if prevMonth != record[Month] {
 			if idx != 0 {
-				monthlyAggregates.WeatherDataForMonth = append(monthlyAggregates.WeatherDataForMonth, getWeatherDataForMonth(currMonthData, prevMonth, prevDate))
+				monthlyAggregates.WeatherDataForMonth = append(monthlyAggregates.WeatherDataForMonth, getWeatherDataForMonth(month, prevMonth, prevDate))
 			}
 
-			currMonthData = WeatherDataForMonth{}
-			currMonthData.FirstRecordedDate = date
+			month = WeatherDataForMonth{}
+			month.FirstRecordedDate = date
 		}
 
-		rainfall, err := strconv.ParseFloat(record[RainfallAmount], 32)
-		if err != nil {
-			panic(err)
+		if prevYear != record[Year] {
+			if idx != 0 {
+				year.MonthlyAggregates = monthlyAggregates
+				data.WeatherDataForYear = append(data.WeatherDataForYear, getWeatherDataForYear(year, prevYear, prevDate))
+			}
+
+			year = WeatherDataForYear{}
+			monthlyAggregates = MonthlyAggregates{}
+			year.FirstRecordedDate = date
 		}
 
-		currMonthData.TotalRainfall += float32(rainfall)
+		rainfall := getRainfall(record[RainfallAmount])
+		month.TotalRainfall += rainfall
+		year.TotalRainfall += rainfall
 		if rainfall > 0.0 {
-			currMonthData.DaysWithRainfall += 1
+			month.DaysWithRainfall += 1
+			year.DaysWithRainfall += 1
 		} else {
-			currMonthData.DaysWithNoRainfall += 1
+			month.DaysWithNoRainfall += 1
+			year.DaysWithNoRainfall += 1
 		}
 
 		prevDate = date
+		prevYear = record[Year]
 		prevMonth = record[Month]
 	}
 
-	monthlyAggregates.WeatherDataForMonth = append(monthlyAggregates.WeatherDataForMonth, getWeatherDataForMonth(currMonthData, prevMonth, prevDate))
+	monthlyAggregates.WeatherDataForMonth = append(monthlyAggregates.WeatherDataForMonth, getWeatherDataForMonth(month, prevMonth, prevDate))
 
-	return monthlyAggregates
+	year.MonthlyAggregates = monthlyAggregates
+	data.WeatherDataForYear = append(data.WeatherDataForYear, getWeatherDataForYear(year, prevYear, prevDate))
+
+	return data
 }
 
 func main() {
 	records := parseCsv("bom_minimal.csv")
-	if len(records) == 0 {
-		println("Error parsing CSV or no records found.")
-		return
-	}
-	monthlyAggregates := parseMonthlyAggregates(records)
-	jsonBytes, err := json.MarshalIndent(monthlyAggregates, "", "    ")
-	if err != nil {
-		panic(err)
-	}
-	fmt.Print(string(jsonBytes))
+	monthlyAggregates := parseWeatherData(records)
+	printJson(monthlyAggregates)
 }
